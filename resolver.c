@@ -28,6 +28,7 @@ typedef struct {
 	unsigned char *rdata;
 } dns_rr;
 
+//able to RR values after building them
 void printRR(dns_rr rr){
 	printf("Name: %s\n", rr.name);
 	printf("type: %04x\n", rr.type);
@@ -45,6 +46,7 @@ void printRR(dns_rr rr){
 	printf("\n");
 }
 
+//Finds rdata using rdata_len
 unsigned char* get_rdata(dns_rdata_len rdata_len, int* temp, char* response){
 	unsigned char* rdata = (unsigned char*)malloc(rdata_len + sizeof(char));
 
@@ -56,6 +58,7 @@ unsigned char* get_rdata(dns_rdata_len rdata_len, int* temp, char* response){
 	return rdata;
 }
 
+//checks to see if the char is a dot
 int is_dot(char c){
 	if(c >= 0x30 && c <= 0x39)
 		return 0;
@@ -65,6 +68,7 @@ int is_dot(char c){
 	return 1;
 }
 
+//gets the rr_class
 dns_rr_class get_RR_class_type(int* temp, char* response){
 	(*temp)--;
 	dns_rr_class class = ((response[*temp] | 0x0000) << 2);
@@ -82,89 +86,7 @@ struct dns_answer_entry {
 
 typedef struct dns_answer_entry dns_answer_entry;
 
-void get_response_values(unsigned char *wire, int length){
-
-	//Used to match request/reply packets.
-	/*printf("Identification (query_id): 0x%2x%2x\n", wire[0], wire[1]);
-
-	printf("QR Flag: %x\n", ((wire[2] & 0x80) >> 7));
-
-	//4 bits
-	printf("Opcode: %x\n",((wire[2] & 01111000) >> 3));
-
-	//AA: Specifies that the responding name server is an authority for the domain name in question section
-	//RD: May be set in a query and is copied into the response. If set, the name server is directed to pursue the query recursively
-	printf("Flags: AA: %x TC: %x RD: %x\n",((wire[2] & 00000100) >> 2), ((wire[2] & 00000010) >> 1), (wire[2] & 00000001));
-	printf("Flags: RA: %x Z: %x AD: %x CD: %x\n",((wire[3] & 0x80) >> 7),
-																							 ((wire[3] & 0x04) >> 6),
-																							 ((wire[3] & 0x20) >> 5),
-																							 ((wire[3] & 0x10) >> 4));
-	printf("RCODE: %x\n", (wire[3] & 0x0A));
-	int questions = (((wire[4] | 0x0000) << 8) | wire[5]);
-	printf("Total questions: 0x%04x\n", questions);
-	int answers = (((wire[6] | 0x0000) << 8) | wire[7]);
-	printf("Total answerRRs: 0x%04x\n", answers);
-	int auth = (((wire[8] | 0x0000) << 8) | wire[9]);
-	printf("Total authorityRRs: 0x%04x\n", auth);
-	int additional =(((wire[10] | 0x0000) << 8) | wire[11]);
-	printf("Total additionalRRs: 0x%04x\n", additional);
-
-	int idx = 12;
-	int end_com = 0;
-	for(; 1; idx++){
-		if(wire[idx] == 0x6d &&
-			 wire[idx - 1] == 0x6f &&
-		 	 wire[idx - 2] == 0x63 &&
-		 	 wire[idx - 3] == 0x03){
-				 end_com = 1;
-			 }
-		if(wire[idx] == 0x00 && end_com){
-			break;
-		}
-	}
-
-	idx++;
-
-	int qtype = (((wire[idx++] >> 7) | 0x0000) | wire[idx++]);
-	printf("qtype: 0x%04x\n", qtype);
-
-	int qclass = (((wire[idx++] >> 7) | 0x000) | wire[idx++]);
-	printf("qclass: 0x%04x\n", qclass);
-
-	int comp_owner = (((wire[idx++] | 0x0000) << 8) | wire[idx++]);
-	printf("comp_owner: 0x%04x\n", comp_owner);
-
-	int response_type = (((wire[idx++] | 0x0000) << 8) | wire[idx++]);
-	printf("response_type: 0x%04x\n", response_type);
-
-	int response_class = (((wire[idx++] | 0x0000) << 8) | wire[idx++]);
-	printf("response_class: 0x%04x\n", response_class);
-
-	int TTL = ( ((wire[idx++] | 0x00000000) << 24) |
-							((wire[idx++] | 0x00000000) << 16) |
-							((wire[idx++] | 0x00000000) << 8)  |
-							(wire[idx++] | 0x00000000) );
-	printf("TTL: 0x%08x\n", TTL);
-
-	int r_data_len = ( ((wire[idx++] | 0x0000) << 8) | wire[idx++]);
-	printf("rdata_len: 0x%04x\n", r_data_len);
-
-	unsigned char r_data[10];
-	int count;
-	for(count = 0; count < r_data_len; count++){
-		r_data[count] = wire[idx++];
-	}
-
-	for(int i = 0; i < r_data_len; i++){
-		if(i == 0)
-			printf("%d\n", r_data[i]);
-		else
-			printf(".%d\n", r_data[i]);
-	}
-	printf("\n");*/
-
-}
-
+//Given function that prints the bytes
 void print_bytes(unsigned char *bytes, int byteslen) {
 	int i, j, byteslen_adjusted;
 	unsigned char c;
@@ -206,6 +128,7 @@ void print_bytes(unsigned char *bytes, int byteslen) {
 	printf("\n");
 }
 
+//Given function that makes the string all lowercase
 void canonicalize_name(char *name) {
 	/*
 	 * Canonicalize name in place.  Change all upper-case characters to
@@ -242,8 +165,9 @@ char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
 		char name[BUF_SIZE];
 		int i = 0;
 
+		//advance index to 0x00
 		while(wire[*indexp] != 0x00){
-			if(wire[*indexp] >= 192){
+			if(wire[*indexp] >= 192){									//if >= 192 it means its a pointer
 				*indexp = wire[*indexp + 1];
 			}
 			else{
@@ -267,7 +191,7 @@ char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
 }
 
 dns_rr_type get_RR_type(int* temp, char* response){
-	while(response[*temp] != 0x00){
+	while(response[*temp] != 0x00){							//advance to 0x00, usually just once
 		(*temp)++;
 	}
 	if(response[*temp + 1] == 0x00){
@@ -280,23 +204,13 @@ dns_rr_type get_RR_type(int* temp, char* response){
 	return rr_type;
 }
 
+//creates a random query id
 unsigned char get_random_id(){
 	return (char)(rand() % 256);
 }
 
+//build a dns query
 unsigned short create_dns_query(char *qname, dns_rr_type qtype, unsigned char *wire) {
-	/*
-	 * Create a wire-formatted DNS (query) message using the provided byte
-	 * array (wire).  Create the header and question sections, including
-	 * the qname and qtype.
-	 *
-	 * INPUT:  qname: the string containing the name to be queried
-	 * INPUT:  qtype: the integer representation of type of the query (type A == 1)
-	 * INPUT:  wire: the pointer to the array of bytes where the DNS wire
-	 *               message should be constructed
-	 * OUTPUT: the length of the DNS wire message
-	 */
-
 
 	 int i;
 	 //Setting the Identification query_id
@@ -349,32 +263,33 @@ unsigned short create_dns_query(char *qname, dns_rr_type qtype, unsigned char *w
 	 return i;
 }
 
+
 int get_answer_RR(unsigned char *response){
 	return(((response[6] | 0x0000) << 8) | response[7]);
 }
 
-int get_index_next_rr(int idx, unsigned char *response, int length){/*may not work*/
-
-	int comp_owner = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-	//printf("comp_owner: 0x%04x\n", comp_owner);
-	int response_type = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-	//printf("response_type: 0x%04x\n", response_type);
-	int response_class = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-	//printf("response_class: 0x%04x\n", response_class);
-	int TTL = ( ((response[idx++] | 0x00000000) << 24) |
-							((response[idx++] | 0x00000000) << 16) |
-							((response[idx++] | 0x00000000) << 8)  |
-							(response[idx++] | 0x00000000) );
-	//printf("TTL: 0x%08x\n", TTL);
-	int r_data_len = ( ((response[idx++] | 0x0000) << 8) | response[idx++]);
-	//printf("rdata_len: 0x%04x\n", r_data_len);
-
-	idx += r_data_len;
-	idx++;
-	return idx;
-
-
-}
+//dont need anymore
+// int get_index_next_rr(int idx, unsigned char *response, int length){
+//
+// 	int comp_owner = (((response[idx++] | 0x0000) << 8) | response[idx++]);
+// 	//printf("comp_owner: 0x%04x\n", comp_owner);
+// 	int response_type = (((response[idx++] | 0x0000) << 8) | response[idx++]);
+// 	//printf("response_type: 0x%04x\n", response_type);
+// 	int response_class = (((response[idx++] | 0x0000) << 8) | response[idx++]);
+// 	//printf("response_class: 0x%04x\n", response_class);
+// 	int TTL = ( ((response[idx++] | 0x00000000) << 24) |
+// 							((response[idx++] | 0x00000000) << 16) |
+// 							((response[idx++] | 0x00000000) << 8)  |
+// 							(response[idx++] | 0x00000000) );
+// 	//printf("TTL: 0x%08x\n", TTL);
+// 	int r_data_len = ( ((response[idx++] | 0x0000) << 8) | response[idx++]);
+// 	//printf("rdata_len: 0x%04x\n", r_data_len);
+//
+// 	idx += r_data_len;
+// 	idx++;
+// 	return idx;
+//
+// }
 
 int get_index_first_rr(unsigned char *response, int length){
 
@@ -394,6 +309,7 @@ int get_index_first_rr(unsigned char *response, int length){
 	return idx;
 }
 
+//checks to see if name from response and original qname are the same
 int matching_name(char* name, char* qname){
 	int i = 0;
 	while(name[i] != '\0'){
@@ -404,25 +320,22 @@ int matching_name(char* name, char* qname){
 	return 1;
 }
 
-// int get_response_type(int idx, char* response, unsigned short length){
-// 	int comp_owner = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-// 	int response_type = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-// 	return response_type;
+//dont need
+// int get_index_rdata(int index_rr,unsigned char* response, unsigned short length){
+// 	//get location of rdata length
+// 	int comp_owner = (((response[index_rr++] | 0x0000) << 8) | response[index_rr++]);
+// 	int response_type = (((response[index_rr++] | 0x0000) << 8) | response[index_rr++]);
+// 	int TTL = ( ((response[index_rr++] | 0x00000000) << 24) |
+// 							((response[index_rr++] | 0x00000000) << 16) |
+// 							((response[index_rr++] | 0x00000000) << 8)  |
+// 							 (response[index_rr++] | 0x00000000) );
+//
+// 	index_rr += 2;
+// 	return index_rr;
 // }
 
-int get_index_rdata(int index_rr,unsigned char* response, unsigned short length){
-	//get location of rdata length
-	int comp_owner = (((response[index_rr++] | 0x0000) << 8) | response[index_rr++]);
-	int response_type = (((response[index_rr++] | 0x0000) << 8) | response[index_rr++]);
-	int TTL = ( ((response[index_rr++] | 0x00000000) << 24) |
-							((response[index_rr++] | 0x00000000) << 16) |
-							((response[index_rr++] | 0x00000000) << 8)  |
-							 (response[index_rr++] | 0x00000000) );
-
-	index_rr += 2;
-	return index_rr;
-}
-
+//look here
+//return the rr_ttl
 dns_rr_ttl get_rr_ttl(int* temp, char* response){
 	(*temp)++;
 	(*temp)++;
@@ -433,13 +346,13 @@ dns_rr_ttl get_rr_ttl(int* temp, char* response){
 	return ttl;
 }
 
+//get rr_len so we can get rdata
 dns_rdata_len get_rr_data_len(int* temp, char* response){
 	dns_rdata_len r_data_len = ( ((response[(*temp)++] | 0x0000) << 8) | response[(*temp)++]);
-
 	return r_data_len;
 }
 
-
+//create the dns_rr struct
 dns_rr* dns_rr_builder(int* index_RR_p, char* response){
 	int start_idx = *index_RR_p;
 	dns_rr* rr = (dns_rr*)malloc(sizeof(dns_rr));
@@ -453,6 +366,7 @@ dns_rr* dns_rr_builder(int* index_RR_p, char* response){
 	return rr;
 }
 
+//dont need
 // unsigned short extract_Rdata(int index_rr, unsigned char* r_data, unsigned char* response, unsigned short length){
 // 	//need to know what index r_data begins at
 //
@@ -505,6 +419,7 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 	int index_RR_p = get_index_first_rr(response, length);
 	int idx = index_RR_p;
 
+	//check to see how many answer rr's we have
 	int answer_rr = get_answer_RR(response);
 
 	dns_rr** RRs = (dns_rr**)malloc(sizeof(dns_rr*) * answer_rr);
@@ -517,6 +432,8 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 	dae_entry = dae_entry->next;
 
 	char owner_rr[BUF_SIZE];
+
+	//if we have 0 answer_rr, it means it was invalid... end here
 	if(answer_rr == 0){
 		free(dae_entry);
 		return NULL;
@@ -524,7 +441,7 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 
 	int i;
 	for(i = 0; i < answer_rr; i++){
-		RRs[i] = dns_rr_builder(&index_RR_p, response);
+		RRs[i] = dns_rr_builder(&index_RR_p, response);				//create the dns_rr for each answer_rr
 		printRR(*RRs[i]);
 	}
 
@@ -580,18 +497,6 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 }
 
 int send_recv_message(unsigned char *request, int requestlen, unsigned char *response, char *server, unsigned short port) {
-	/*
-	 * Send a message (request) over UDP to a server (server) and port
-	 * (port) and wait for a response, which is placed in another byte
-	 * array (response).  Create a socket, "connect()" it to the
-	 * appropriate destination, and then use send() and recv();
-	 *
-	 * INPUT:  request: a pointer to an array of bytes that should be sent
-	 * INPUT:  requestlen: the length of request, in bytes.
-	 * INPUT:  response: a pointer to an array of bytes in which the
-	 *             response should be received
-	 * OUTPUT: the size (bytes) of the response received
-	 */
 
 	 struct addrinfo hints;
 	 struct addrinfo *result, *rp;
@@ -602,7 +507,7 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
 
 	 struct sockaddr_in ip4addr;
 
-	 ip4addr.sin_family = AF_INET;    /* Allow IPv4 or IPv6 */
+	 ip4addr.sin_family = AF_INET;
 	 ip4addr.sin_port = htons(port);
 
 	 inet_pton(AF_INET, server, &ip4addr.sin_addr);
@@ -612,9 +517,6 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
  		fprintf(stderr, "Could not connect\n");
  		exit(EXIT_FAILURE);
  	}
-
-	/* Send remaining command-line arguments as separate
-	   datagrams, and read responses from server */
 
 	len = requestlen + 1;
 
@@ -633,7 +535,7 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
 }
 
 dns_answer_entry *resolve(char *qname, char *server) {
-	//Convert all chars to lowercase if necessary
+
 	unsigned char wire[BUF_SIZE];
 	unsigned char response[BUF_SIZE];
 	unsigned short query_length;
