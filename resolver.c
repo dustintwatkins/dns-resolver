@@ -28,6 +28,35 @@ typedef struct {
 	unsigned char *rdata;
 } dns_rr;
 
+unsigned char* get_rdata(dns_rdata_len rdata_len, int* temp, char* response){
+	unsigned char* rdata = (unsigned char*)malloc(rdata_len + sizeof(char));
+
+	int count;
+	for(count = 0; count < rdata_len; count++){
+		rdata[count] = response[(*temp)++];
+	}
+
+	return rdata;
+}
+
+int is_dot(char c){
+	if(c >= 0x30 && c <= 0x39)
+		return 0;
+	if(c >= 0x61 && c <= 0x7A)
+		return 0;
+
+	return 1;
+}
+
+dns_rr_class get_RR_class_type(int* temp, char* response){
+	(*temp)--;
+	dns_rr_class class = ((response[*temp] | 0x0000) << 2);
+	(*temp)++;
+	class = class | response[*temp];
+	(*temp)++;
+	return class;
+}
+
 struct dns_answer_entry;
 struct dns_answer_entry {
 	char *value;
@@ -191,45 +220,33 @@ void canonicalize_name(char *name) {
 	}
 }
 
-int name_ascii_to_wire(char *name, unsigned char *wire) {
-	/*
-	 * Convert a DNS name from string representation (dot-separated labels)
-	 * to DNS wire format, using the provided byte array (wire).  Return
-	 * the number of bytes used by the name in wire format.
-	 *
-	 * INPUT:  name: the string containing the domain name
-	 * INPUT:  wire: a pointer to the array of bytes where the
-	 *              wire-formatted name should be constructed
-	 * OUTPUT: the length of the wire-formatted name.
-	 */
-
-}
-
 char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
 
-	/* Extract the wire-formatted DNS name at the offset specified by
-	 * *indexp in the array of bytes provided (wire) and return its string
-	 * representation (dot-separated labels) in a char array allocated for
-	 * that purpose.  Update the value pointed to by indexp to the next
-	 * value beyond the name.
-	 *
-	 * INPUT:  wire: a pointer to an array of bytes
-	 * INPUT:  indexp, a pointer to the index in the wire where the
-	 *              wire-formatted name begins
-	 * OUTPUT: a string containing the string representation of the name,
-	 *              allocated on the heap.
-	 */
-	 printf("wire = %s\n", wire);
-	 printf("index = %d\n", indexp);
-	 char * name_ascii;
-	 unsigned int i = 0;
-	 /*while(!is_dot(wire[0])){
-		 name_ascii[i] = wire[indexp];
-		 i++;
-		 indexp++;
-	 }
-	 printf("name = %s\n", name_ascii);*/
-	 return name_ascii;
+		char name[BUF_SIZE];
+		int i = 0;
+
+		while(wire[*indexp] != 0x00){
+			if(wire[*indexp] >= 192){
+				*indexp = wire[*indexp + 1];
+			}
+			else{
+				if(is_dot(wire[*indexp]) && i > 0)
+					name[i] = '.';
+				else
+					name[i] = wire[*indexp];
+				i++;
+				(*indexp)++;
+			}
+		}
+
+		char* val = (char*)malloc(i);
+		int j;
+		for(j = 0; j < i; j++)
+			val[j] = name[j+1];
+
+		val[j] = '\0';
+		canonicalize_name(val);
+		return val;
 }
 
 dns_rr rr_from_wire(unsigned char *wire, int *indexp, int query_only) {
@@ -269,6 +286,20 @@ int rr_to_wire(dns_rr rr, unsigned char *wire, int query_only) {
 	 * OUTPUT: the length of the wire-formatted resource record.
 	 *
 	 */
+}
+
+dns_rr_type* get_RR_type(int* temp, char* response){
+	while(response[*temp] != 0x00){
+		(*temp)++;
+	}
+	if(response[*temp + 1] == 0x00){
+		(*temp)++;
+	}
+	dns_rr_type rr_type = ((response[*temp] | 0x0000) << 2);
+	(*temp)++;
+	rr_type = rr_type | response[*temp];
+
+	return rr_type;
 }
 
 unsigned char get_random_id(){
@@ -385,48 +416,40 @@ int get_index_first_rr(unsigned char *response, int length){
 	return idx;
 }
 
-int is_dot(char c){
-	if(c >= 0x30 && c <= 0x39)
-		return 0;
-	if(c >= 0x61 && c <= 0x7A)
-		return 0;
+// unsigned short get_owner_rr(unsigned char* owner_rr, int index_curr_rr, unsigned char *response, int length){
+// 	//first decompress owner
+// 	//then return it in a form that matches the qname
+// 	int start_owner_name = 0;
+// 	//this is after www, if >= 192 its an alias,
+//
+// 	if((int)response[index_curr_rr] >= 192){					//Val >= 192 means its a pointer (compressed name)
+// 		start_owner_name = (int)response[index_curr_rr + 1];
+// 		name_ascii_from_wire(response, &index_curr_rr);
+// 	}
+// 	else																				//val < 192 means its the real name
+// 		start_owner_name = (index_curr_rr + 1);
+//
+// 	unsigned short i = 0;
+// 	start_owner_name++;
+// 	while(response[start_owner_name] != 0x00){
+// 		if(is_dot(response[start_owner_name]))
+// 			owner_rr[i] = '.';
+// 		else
+// 			owner_rr[i] = response[start_owner_name];
+//
+// 		start_owner_name++;
+// 		i++;
+// 	}
+//
+// 	return i;
+// }
 
-	return 1;
-}
-
-unsigned short get_owner_rr(unsigned char* owner_rr, int index_curr_rr, unsigned char *response, int length){
-	//first decompress owner
-	//then return it in a form that matches the qname
-	int start_owner_name = 0;
-	//this is after www, if >= 192 its an alias,
-
-	if((int)response[index_curr_rr] >= 192){					//Val >= 192 means its a pointer (compressed name)
-		start_owner_name = (int)response[index_curr_rr + 1];
-		name_ascii_from_wire(response, index_curr_rr);
-	}
-	else																				//val < 192 means its the real name
-		start_owner_name = (index_curr_rr + 1);
-
-	unsigned short i = 0;
-	start_owner_name++;
-	while(response[start_owner_name] != 0x00){
-		if(is_dot(response[start_owner_name]))
-			owner_rr[i] = '.';
-		else
-			owner_rr[i] = response[start_owner_name];
-
-		start_owner_name++;
-		i++;
-	}
-
-	return i;
-}
-
-int matching_name(unsigned char* owner_rr, unsigned short length_owner, char* qname){
+int matching_name(char* name, char* qname){
 	int i = 0;
-	for(i = 0; i < length_owner; i++){
-		if(owner_rr[i] != qname[i])
+	while(name[i] != '\0'){
+		if(name[i] != qname[i])
 			return 0;
+		i++;
 	}
 	return 1;
 }
@@ -450,109 +473,159 @@ int get_index_rdata(int index_rr,unsigned char* response, unsigned short length)
 	return index_rr;
 }
 
-unsigned short extract_Rdata(int index_rr, unsigned char* r_data, unsigned char* response, unsigned short length){
-	//need to know what index r_data begins at
+dns_rr_ttl get_rr_ttl(int* temp, char* response){
+	(*temp)++;
+	(*temp)++;
+	dns_rr_ttl ttl = ( ((response[(*temp)++] | 0x00000000) << 24) |
+							((response[(*temp)++] | 0x00000000) << 16) |
+							((response[(*temp)++] | 0x00000000) << 8)  |
+							 (response[(*temp)++] | 0x00000000) );
+	return ttl;
+}
 
-	int index_length_Rdata = get_index_rdata(index_rr, response, length);
+dns_rdata_len get_rr_data_len(int* temp, char* response){
+	dns_rdata_len r_data_len = ( ((response[(*temp)++] | 0x0000) << 8) | response[(*temp)++]);
 
-	int length_Rdata = (((response[index_length_Rdata++] | 0x0000) << 8) | response[index_length_Rdata++]);
+	return r_data_len;
+}
 
-	//prinf("first num of IP addr: %d\n", response[index_length_Rdata++];)
 
-	unsigned int r_data_bytes[10];
+dns_rr* dns_rr_builder(int* index_RR_p, char* response){
+	int start_idx = *index_RR_p;
+	dns_rr* rr = (dns_rr*)malloc(sizeof(dns_rr));
+	rr->name = name_ascii_from_wire(response, index_RR_p);
+	*index_RR_p = start_idx;
+	rr->type = get_RR_type(index_RR_p, response);
+	rr->class = get_RR_class_type(index_RR_p, response);
+	rr->ttl = get_rr_ttl(index_RR_p, response);
+	rr->rdata_len = get_rr_data_len(index_RR_p, response);
+	rr->rdata = get_rdata(rr->rdata_len, index_RR_p, response);
+	return rr;
+}
 
-	int count;
-	for(count = 0; count < length_Rdata; count++){
-		r_data_bytes[count] = (unsigned int)response[index_length_Rdata++];
-		//printf("%d\n", (unsigned int)r_data_bytes[count]);
-	}
-	count = 0;
+// unsigned short extract_Rdata(int index_rr, unsigned char* r_data, unsigned char* response, unsigned short length){
+// 	//need to know what index r_data begins at
+//
+// 	int index_length_Rdata = get_index_rdata(index_rr, response, length);
+//
+// 	int length_Rdata = (((response[index_length_Rdata++] | 0x0000) << 8) | response[index_length_Rdata++]);
+//
+// 	//prinf("first num of IP addr: %d\n", response[index_length_Rdata++];)
+//
+// 	unsigned int r_data_bytes[10];
+//
+// 	int count;
+// 	for(count = 0; count < length_Rdata; count++){
+// 		r_data_bytes[count] = (unsigned int)response[index_length_Rdata++];
+// 		//printf("%d\n", (unsigned int)r_data_bytes[count]);
+// 	}
+// 	count = 0;
+// 	int i;
+//
+// 	for(i = 0; i < length_Rdata; i++){
+// 		if(i == 0){
+// 			r_data[count] = (unsigned char)r_data_bytes[i];
+// 		}
+// 		else{
+// 			r_data[count] = '.';
+// 			count++;
+// 			r_data[count] = (unsigned char)r_data_bytes[i];
+// 		}
+// 		count++;
+// 	}
+// 	return count;
+// }
+
+int get_index_r_data(char* response, unsigned char* rdata, dns_rdata_len rdata_len){
 	int i;
-
-	for(i = 0; i < length_Rdata; i++){
-		if(i == 0){
-			r_data[count] = (unsigned char)r_data_bytes[i];
-		}
-		else{
-			r_data[count] = '.';
-			count++;
-			r_data[count] = (unsigned char)r_data_bytes[i];
-		}
-		count++;
+	int j = 0;
+	int start = 0;
+	for(i = 0; 1; i++){
+		start = i;
+			if(response[i] == rdata[j]){
+				if(response[i] != rdata[j])
+					break;
+			}
+			return start;
 	}
-	return count;
 }
 
 dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned char *response, int length) {
-	/*
-	 * Extract the IPv4 address from the answer section, following any
-	 * aliases that might be found, and return the string representation of
-	 * the IP address.  If no address is found, then return NULL.
-	 *
-	 * INPUT:  qname: the string containing the name that was queried
-	 * INPUT:  qtype: the integer representation of type of the query (type A == 1)
-	 * INPUT:  wire: the pointer to the array of bytes representing the DNS wire message
-	 * OUTPUT: a linked list of dns_answer_entrys the value member of each
-	 * reflecting either the name or IP address.  If
-	 */
 
-	 /*
-	 set qname to the initial name queried
-	 (i.e., the query name in the question section)
-	 for each resource record (RR) in the answer section:
-	 if the owner name of RR matches qname and the type matches the qtype:
-	 extract the address from the RR, convert it to a string, and add it
-	 to the result list
-	 else if the owner name of RR matches qname and the type is (5) CNAME:
-	 */
+	int index_RR_p = get_index_first_rr(response, length);
+	int idx = index_RR_p;
 
-	dns_answer_entry* dae_entry = (dns_answer_entry*)malloc(sizeof(dns_answer_entry)); //work out malloc junk...
-	dae_entry->value = (char*)malloc(BUF_SIZE);
+	int answer_rr = get_answer_RR(response);
+
+	dns_rr** RRs = (dns_rr**)malloc(sizeof(dns_rr*) * answer_rr);
+	//dns_rr* rr = get_RR_type(&index_RR_p, response);
+	index_RR_p = idx;
+
+	dns_answer_entry* dae_entry = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
+	dns_answer_entry *first = dae_entry;
+
+	dae_entry = dae_entry->next;
 
 	char owner_rr[BUF_SIZE];
-	int answer_rr = get_answer_RR(response);
 	if(answer_rr == 0){
 		free(dae_entry);
 		return NULL;
 	}
 
-	int index_rr;
-	index_rr = get_index_first_rr(response, length);
-	unsigned short length_owner;
-	for(int i = 0; i < answer_rr; i++){
+	int i;
+	for(i = 0; i < answer_rr; i++){
+		RRs[i] = dns_rr_builder(&index_RR_p, response);
+	}
 
-		length_owner = get_owner_rr(owner_rr, index_rr, response, length);
-		int match = matching_name(owner_rr, length_owner, qname);
-		int r_type = get_response_type(index_rr, response, length);
-
-		if(match && r_type == (int)qtype){
-
-			unsigned char r_data[10];
-			unsigned short length_Rdata = extract_Rdata(index_rr, r_data, response, length);
-			dae_entry->value = r_data;
-
-			//see contents of IP
-			int k = 0;
-			for(; k < length_Rdata; k++){
-				if(r_data[k] == 0x2e){
-					printf(".");
-				}
-				else{
-					printf("%d", r_data[k]);
-				}
+	int passes = 1;
+	dns_answer_entry* next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
+	for(i = 0; i < answer_rr; i++){
+		int match = matching_name(RRs[i]->name, qname);
+		if(RRs[i]->type == qtype && match){
+			int count = 0;
+			struct in_addr addr;
+			addr.s_addr = htonl( ((RRs[i]->rdata[count++] | 0x00000000) << 24) |
+									((RRs[i]->rdata[count++] | 0x00000000) << 16) |
+									((RRs[i]->rdata[count++] | 0x00000000) << 8)  |
+									 (RRs[i]->rdata[count++] | 0x00000000) );
+			char* s = inet_ntoa(addr);
+			if(passes){
+				first->value = (char*)malloc(*s);
+				strcpy(first->value,s);
+				first->next = next;
+				next->next = NULL;
+				passes = 0;
 			}
-			printf("\n");
-
+			else{
+				next->value = (char*) malloc(*s);
+				strcpy(first->value,s);
+				next->next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
+				next = next->next;
+			}
+			next->next = NULL;
 		}
-		else if(match && r_type == 5){//CNAME has multiple aliases, return all of them
-			dae_entry->next = get_answer_address(qname, qtype, response, length);
-		}
-		if(i < answer_rr - 1){
-			index_rr = get_index_next_rr(index_rr, response, length);
+		else if(match && RRs[i]->type == 5){
+			int start = get_index_r_data(response, RRs[i]->rdata, RRs[i]->rdata_len);
+			qname = name_ascii_from_wire(response, &start);
+			printf("%s\n", qname);
+			if(passes){
+				first->value = (char*)malloc(*qname);
+				strcpy(first->value, qname);
+				first->next = next;
+				passes = 0;
+			}
+			else{
+				next->value = (char*) malloc(*qname);
+				strcpy(first->value,qname);
+				next->next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
+				next = next->next;
+			}
+			next->next = NULL;
+			passes = 0;
 		}
 	}
-	printf("dae->val = %s\n", dae_entry->value);
-	return dae_entry;
+
+	return first;
 }
 
 int send_recv_message(unsigned char *request, int requestlen, unsigned char *response, char *server, unsigned short port) {
@@ -604,7 +677,7 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
 			perror("read");
 			exit(EXIT_FAILURE);
 		}
-		print_bytes(response, nread);
+
 		return nread;
 }
 
@@ -618,7 +691,6 @@ dns_answer_entry *resolve(char *qname, char *server) {
 	query_length = create_dns_query(qname, qtype, wire);
 
 	int sizeOf_response = send_recv_message(wire, query_length, response, server, 53);
-	printf("sizeOf_response = %d\n", sizeOf_response);
 	if(sizeOf_response == 0){
 		printf("No response returned\n");
 		exit(1);
@@ -636,13 +708,13 @@ int main(int argc, char *argv[]) {
 	ans = resolve(argv[1], argv[2]);
 
 	//If no answer records... Names don't resolve
-	if(ans == NULL){
-		printf("no answer record, invalid domain name\n");
-	}
-	else{
 		while (ans != NULL) {
-			printf("here %s\n", ans->value);
+			if(ans->value != NULL){
+				printf("%s\n", ans->value);
+			}
+			printf("here\n");
 			ans = ans->next;
+			printf("there\n");
+
 		}
-	}
 }
