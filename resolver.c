@@ -639,9 +639,10 @@ int main(int argc, char *argv[]) {
 	if(ans == NULL){
 		printf("no answer record, invalid domain name\n");
 	}
-
-	while (ans != NULL) {
-		printf("here %s\n", ans->value);
-		ans = ans->next;
+	else{
+		while (ans != NULL) {
+			printf("here %s\n", ans->value);
+			ans = ans->next;
+		}
 	}
 }
