@@ -28,6 +28,23 @@ typedef struct {
 	unsigned char *rdata;
 } dns_rr;
 
+void printRR(dns_rr rr){
+	printf("Name: %s\n", rr.name);
+	printf("type: %04x\n", rr.type);
+	printf("class: %04x\n", rr.class);
+	printf("ttl: %08x\n", rr.ttl);
+	printf("rdatlen: %04x\n", rr.rdata_len);
+
+	int i =0;
+	for(; i < rr.rdata_len; i++){
+		if((i+1) % 4 == 0){
+			printf("\n");
+		}
+		printf("%02x ", rr.rdata[i]);
+	}
+	printf("\n");
+}
+
 unsigned char* get_rdata(dns_rdata_len rdata_len, int* temp, char* response){
 	unsigned char* rdata = (unsigned char*)malloc(rdata_len + sizeof(char));
 
@@ -249,46 +266,7 @@ char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
 		return val;
 }
 
-dns_rr rr_from_wire(unsigned char *wire, int *indexp, int query_only) {
-	/*
-	 * Extract the wire-formatted resource record at the offset specified by
-	 * *indexp in the array of bytes provided (wire) and return a
-	 * dns_rr (struct) populated with its contents. Update the value
-	 * pointed to by indexp to the next value beyond the resource record.
-	 *
-	 * INPUT:  wire: a pointer to an array of bytes
-	 * INPUT:  indexp: a pointer to the index in the wire where the
-	 *              wire-formatted resource record begins
-	 * INPUT:  query_only: a boolean value (1 or 0) which indicates whether
-	 *              we are extracting a full resource record or only a
-	 *              query (i.e., in the question section of the DNS
-	 *              message).  In the case of the latter, the ttl,
-	 *              rdata_len, and rdata are skipped.
-	 * OUTPUT: the resource record (struct)
-	 */
-
-}
-
-int rr_to_wire(dns_rr rr, unsigned char *wire, int query_only) {
-	/*
-	 * Convert a DNS resource record struct to DNS wire format, using the
-	 * provided byte array (wire).  Return the number of bytes used by the
-	 * name in wire format.
-	 *
-	 * INPUT:  rr: the dns_rr struct containing the rr record
-	 * INPUT:  wire: a pointer to the array of bytes where the
-	 *             wire-formatted resource record should be constructed
-	 * INPUT:  query_only: a boolean value (1 or 0) which indicates whether
-	 *              we are constructing a full resource record or only a
-	 *              query (i.e., in the question section of the DNS
-	 *              message).  In the case of the latter, the ttl,
-	 *              rdata_len, and rdata are skipped.
-	 * OUTPUT: the length of the wire-formatted resource record.
-	 *
-	 */
-}
-
-dns_rr_type* get_RR_type(int* temp, char* response){
+dns_rr_type get_RR_type(int* temp, char* response){
 	while(response[*temp] != 0x00){
 		(*temp)++;
 	}
@@ -416,34 +394,6 @@ int get_index_first_rr(unsigned char *response, int length){
 	return idx;
 }
 
-// unsigned short get_owner_rr(unsigned char* owner_rr, int index_curr_rr, unsigned char *response, int length){
-// 	//first decompress owner
-// 	//then return it in a form that matches the qname
-// 	int start_owner_name = 0;
-// 	//this is after www, if >= 192 its an alias,
-//
-// 	if((int)response[index_curr_rr] >= 192){					//Val >= 192 means its a pointer (compressed name)
-// 		start_owner_name = (int)response[index_curr_rr + 1];
-// 		name_ascii_from_wire(response, &index_curr_rr);
-// 	}
-// 	else																				//val < 192 means its the real name
-// 		start_owner_name = (index_curr_rr + 1);
-//
-// 	unsigned short i = 0;
-// 	start_owner_name++;
-// 	while(response[start_owner_name] != 0x00){
-// 		if(is_dot(response[start_owner_name]))
-// 			owner_rr[i] = '.';
-// 		else
-// 			owner_rr[i] = response[start_owner_name];
-//
-// 		start_owner_name++;
-// 		i++;
-// 	}
-//
-// 	return i;
-// }
-
 int matching_name(char* name, char* qname){
 	int i = 0;
 	while(name[i] != '\0'){
@@ -454,11 +404,11 @@ int matching_name(char* name, char* qname){
 	return 1;
 }
 
-int get_response_type(int idx, char* response, unsigned short length){
-	int comp_owner = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-	int response_type = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-	return response_type;
-}
+// int get_response_type(int idx, char* response, unsigned short length){
+// 	int comp_owner = (((response[idx++] | 0x0000) << 8) | response[idx++]);
+// 	int response_type = (((response[idx++] | 0x0000) << 8) | response[idx++]);
+// 	return response_type;
+// }
 
 int get_index_rdata(int index_rr,unsigned char* response, unsigned short length){
 	//get location of rdata length
@@ -575,6 +525,7 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 	int i;
 	for(i = 0; i < answer_rr; i++){
 		RRs[i] = dns_rr_builder(&index_RR_p, response);
+		printRR(*RRs[i]);
 	}
 
 	int passes = 1;
@@ -712,9 +663,6 @@ int main(int argc, char *argv[]) {
 			if(ans->value != NULL){
 				printf("%s\n", ans->value);
 			}
-			printf("here\n");
 			ans = ans->next;
-			printf("there\n");
-
 		}
 }
