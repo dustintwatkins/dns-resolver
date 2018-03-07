@@ -68,16 +68,6 @@ int is_dot(char c){
 	return 1;
 }
 
-//gets the rr_class
-dns_rr_class get_RR_class_type(int* temp, char* response){
-	(*temp)--;
-	dns_rr_class class = ((response[*temp] | 0x0000) << 2);
-	(*temp)++;
-	class = class | response[*temp];
-	(*temp)++;
-	return class;
-}
-
 struct dns_answer_entry;
 struct dns_answer_entry {
 	char *value;
@@ -268,29 +258,6 @@ int get_answer_RR(unsigned char *response){
 	return(((response[6] | 0x0000) << 8) | response[7]);
 }
 
-//dont need anymore
-// int get_index_next_rr(int idx, unsigned char *response, int length){
-//
-// 	int comp_owner = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-// 	//printf("comp_owner: 0x%04x\n", comp_owner);
-// 	int response_type = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-// 	//printf("response_type: 0x%04x\n", response_type);
-// 	int response_class = (((response[idx++] | 0x0000) << 8) | response[idx++]);
-// 	//printf("response_class: 0x%04x\n", response_class);
-// 	int TTL = ( ((response[idx++] | 0x00000000) << 24) |
-// 							((response[idx++] | 0x00000000) << 16) |
-// 							((response[idx++] | 0x00000000) << 8)  |
-// 							(response[idx++] | 0x00000000) );
-// 	//printf("TTL: 0x%08x\n", TTL);
-// 	int r_data_len = ( ((response[idx++] | 0x0000) << 8) | response[idx++]);
-// 	//printf("rdata_len: 0x%04x\n", r_data_len);
-//
-// 	idx += r_data_len;
-// 	idx++;
-// 	return idx;
-//
-// }
-
 int get_index_first_rr(unsigned char *response, int length){
 
 	int idx = 12;
@@ -320,29 +287,35 @@ int matching_name(char* name, char* qname){
 	return 1;
 }
 
-//dont need
-// int get_index_rdata(int index_rr,unsigned char* response, unsigned short length){
-// 	//get location of rdata length
-// 	int comp_owner = (((response[index_rr++] | 0x0000) << 8) | response[index_rr++]);
-// 	int response_type = (((response[index_rr++] | 0x0000) << 8) | response[index_rr++]);
-// 	int TTL = ( ((response[index_rr++] | 0x00000000) << 24) |
-// 							((response[index_rr++] | 0x00000000) << 16) |
-// 							((response[index_rr++] | 0x00000000) << 8)  |
-// 							 (response[index_rr++] | 0x00000000) );
-//
-// 	index_rr += 2;
-// 	return index_rr;
-// }
+//gets the rr_class
+dns_rr_class get_RR_class_type(int* temp, char* response){
+	(*temp)++;
+	dns_rr_class class = ((response[*temp] | 0x0000) << 2);
+	(*temp)++;
+	return class | response[*temp];
+	//printf("class = %04x\n", response[*temp]);
+	//printf("idx into class = %02x\n", response[*temp]);
+	//(*temp)++;
+	//printf("idx into class = %02x\n", response[*temp]);
+	//printf("class = %04x\n", response[*temp]);
+	//return class;
+}
 
-//look here
 //return the rr_ttl
 dns_rr_ttl get_rr_ttl(int* temp, char* response){
+	//printf("idx ttl = %02x\n", response[*temp]);
+	//(*temp)++;
 	(*temp)++;
-	(*temp)++;
-	dns_rr_ttl ttl = ( ((response[(*temp)++] | 0x00000000) << 24) |
+	// printf("idx ttl = %08x\n", (response[(*temp)++] | 0x00000000) << 24);
+	// printf("idx ttl = %08x\n", (response[(*temp)++] | 0x00000000) << 16);
+	// printf("idx ttl = %08x\n", (response[(*temp)++] | 0x00000000) << 8);
+	// printf("after = %08x\n", response[*temp]);
+	// printf("idx ttl = %08x\n", (response[(*temp)++] | 0x00000000));
+	dns_rr_ttl ttl = (((response[(*temp)++] | 0x00000000) << 24) |
 							((response[(*temp)++] | 0x00000000) << 16) |
 							((response[(*temp)++] | 0x00000000) << 8)  |
 							 (response[(*temp)++] | 0x00000000) );
+	//printf("ttl = %08x\n", ttl);
 	return ttl;
 }
 
@@ -366,40 +339,6 @@ dns_rr* dns_rr_builder(int* index_RR_p, char* response){
 	return rr;
 }
 
-//dont need
-// unsigned short extract_Rdata(int index_rr, unsigned char* r_data, unsigned char* response, unsigned short length){
-// 	//need to know what index r_data begins at
-//
-// 	int index_length_Rdata = get_index_rdata(index_rr, response, length);
-//
-// 	int length_Rdata = (((response[index_length_Rdata++] | 0x0000) << 8) | response[index_length_Rdata++]);
-//
-// 	//prinf("first num of IP addr: %d\n", response[index_length_Rdata++];)
-//
-// 	unsigned int r_data_bytes[10];
-//
-// 	int count;
-// 	for(count = 0; count < length_Rdata; count++){
-// 		r_data_bytes[count] = (unsigned int)response[index_length_Rdata++];
-// 		//printf("%d\n", (unsigned int)r_data_bytes[count]);
-// 	}
-// 	count = 0;
-// 	int i;
-//
-// 	for(i = 0; i < length_Rdata; i++){
-// 		if(i == 0){
-// 			r_data[count] = (unsigned char)r_data_bytes[i];
-// 		}
-// 		else{
-// 			r_data[count] = '.';
-// 			count++;
-// 			r_data[count] = (unsigned char)r_data_bytes[i];
-// 		}
-// 		count++;
-// 	}
-// 	return count;
-// }
-
 int get_index_r_data(char* response, unsigned char* rdata, dns_rdata_len rdata_len){
 	int i;
 	int j = 0;
@@ -407,10 +346,9 @@ int get_index_r_data(char* response, unsigned char* rdata, dns_rdata_len rdata_l
 	for(i = 0; 1; i++){
 		start = i;
 			if(response[i] == rdata[j]){
-				if(response[i] != rdata[j])
-					break;
+				if(response[i + 1] == rdata[j + 1])
+					return start;
 			}
-			return start;
 	}
 }
 
@@ -427,7 +365,7 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 	index_RR_p = idx;
 
 	dns_answer_entry* dae_entry = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
-	dns_answer_entry *first = dae_entry;
+	dns_answer_entry* first = dae_entry;
 
 	dae_entry = dae_entry->next;
 
@@ -442,9 +380,8 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 	int i;
 	for(i = 0; i < answer_rr; i++){
 		RRs[i] = dns_rr_builder(&index_RR_p, response);				//create the dns_rr for each answer_rr
-		printRR(*RRs[i]);
+		//printRR(*RRs[i]);
 	}
-
 	int passes = 1;
 	dns_answer_entry* next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
 	for(i = 0; i < answer_rr; i++){
@@ -475,18 +412,24 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 		else if(match && RRs[i]->type == 5){
 			int start = get_index_r_data(response, RRs[i]->rdata, RRs[i]->rdata_len);
 			qname = name_ascii_from_wire(response, &start);
+
 			printf("%s\n", qname);
 			if(passes){
+				printf("here %s\n", qname);
+
 				first->value = (char*)malloc(*qname);
 				strcpy(first->value, qname);
 				first->next = next;
+				printf("first = %s\n", first->next->value);
 				passes = 0;
 			}
 			else{
+				printf("there\n");
 				next->value = (char*) malloc(*qname);
 				strcpy(first->value,qname);
 				next->next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
 				next = next->next;
+				printf("next = %s\n", next->value);
 			}
 			next->next = NULL;
 			passes = 0;
@@ -530,7 +473,7 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
 			perror("read");
 			exit(EXIT_FAILURE);
 		}
-
+		//print_bytes(response, nread);
 		return nread;
 }
 
