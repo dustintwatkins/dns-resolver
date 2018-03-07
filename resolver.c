@@ -28,6 +28,14 @@ typedef struct {
 	unsigned char *rdata;
 } dns_rr;
 
+struct dns_answer_entry;
+struct dns_answer_entry {
+	char *value;
+	struct dns_answer_entry *next;
+};
+
+typedef struct dns_answer_entry dns_answer_entry;
+
 //able to RR values after building them
 void printRR(dns_rr rr){
 	printf("Name: %s\n", rr.name);
@@ -60,21 +68,13 @@ unsigned char* get_rdata(dns_rdata_len rdata_len, int* temp, char* response){
 
 //checks to see if the char is a dot
 int is_dot(char c){
-	if(c >= 0x30 && c <= 0x39)
+	if(c >= 0x30 && c <= 0x39)	//numerical hex
 		return 0;
-	if(c >= 0x61 && c <= 0x7A)
+	if(c >= 0x61 && c <= 0x7A)	//Alpha hex lowercase bc we canonicalized the name
 		return 0;
 
 	return 1;
 }
-
-struct dns_answer_entry;
-struct dns_answer_entry {
-	char *value;
-	struct dns_answer_entry *next;
-};
-
-typedef struct dns_answer_entry dns_answer_entry;
 
 //Given function that prints the bytes
 void print_bytes(unsigned char *bytes, int byteslen) {
@@ -150,6 +150,7 @@ void canonicalize_name(char *name) {
 	}
 }
 
+//Get the name from a given index
 char *name_ascii_from_wire(unsigned char *wire, int *indexp) {
 
 		char name[BUF_SIZE];
@@ -194,12 +195,12 @@ dns_rr_type get_RR_type(int* temp, char* response){
 	return rr_type;
 }
 
-//creates a random query id
+//Creates a random query id
 unsigned char get_random_id(){
 	return (char)(rand() % 256);
 }
 
-//build a dns query
+//Build a dns query
 unsigned short create_dns_query(char *qname, dns_rr_type qtype, unsigned char *wire) {
 
 	 int i;
@@ -221,7 +222,7 @@ unsigned short create_dns_query(char *qname, dns_rr_type qtype, unsigned char *w
 
 	 canonicalize_name(qname);									//Set to all lowercase
 	 int true_size;
-	 for(true_size = 0; 1; true_size++){					//find truesize of qname
+	 for(true_size = 0; 1; true_size++){				//find truesize of qname
 		 if(qname[true_size] == '\0')
 		 	break;
 	 }
@@ -253,20 +254,21 @@ unsigned short create_dns_query(char *qname, dns_rr_type qtype, unsigned char *w
 	 return i;
 }
 
-
+//Returns the number of answer rr's
 int get_answer_RR(unsigned char *response){
 	return(((response[6] | 0x0000) << 8) | response[7]);
 }
 
+//Returns the index of the first rr
 int get_index_first_rr(unsigned char *response, int length){
 
-	int idx = 12;
-	for(; 1; idx++){
+	int idx = 12;											//after flags and what not
+	for(; 1; idx++){									//iterate to end of the domain name
 		if(response[idx] == 0x00)
 			break;
 	}
 
-	idx++;
+	idx++;														//advance index 1 past the end of the domain name to enter qtype (4bytes)
 	int qtype = (((response[idx++] >> 7) | 0x0000) | response[idx++]);
 	//printf("qtype: 0x%04x\n", qtype);
 	int qclass = (((response[idx++] >> 7) | 0x000) | response[idx++]);
@@ -276,7 +278,7 @@ int get_index_first_rr(unsigned char *response, int length){
 	return idx;
 }
 
-//checks to see if name from response and original qname are the same
+//Checks to see if name from response and original qname are the same
 int matching_name(char* name, char* qname){
 	int i = 0;
 	while(name[i] != '\0'){
@@ -287,45 +289,31 @@ int matching_name(char* name, char* qname){
 	return 1;
 }
 
-//gets the rr_class
+//Gets the rr_class
 dns_rr_class get_RR_class_type(int* temp, char* response){
-	(*temp)++;
-	dns_rr_class class = ((response[*temp] | 0x0000) << 2);
-	(*temp)++;
-	return class | response[*temp];
-	//printf("class = %04x\n", response[*temp]);
-	//printf("idx into class = %02x\n", response[*temp]);
-	//(*temp)++;
-	//printf("idx into class = %02x\n", response[*temp]);
-	//printf("class = %04x\n", response[*temp]);
-	//return class;
+	(*temp)++;																								//Currently on last index of type, advance to first index of class
+	dns_rr_class class = ((response[*temp] | 0x0000) << 2);		//Shift the byte left to get them on the right left hand side
+	(*temp)++;																								//Increment index to get to next byte
+	return class | response[*temp];														//Or the two values together should be 0x000 | 0x0001  = 0x0001 (assuming the class byte is 01)
 }
 
-//return the rr_ttl
+//Return the rr_ttl
 dns_rr_ttl get_rr_ttl(int* temp, char* response){
-	//printf("idx ttl = %02x\n", response[*temp]);
-	//(*temp)++;
-	(*temp)++;
-	// printf("idx ttl = %08x\n", (response[(*temp)++] | 0x00000000) << 24);
-	// printf("idx ttl = %08x\n", (response[(*temp)++] | 0x00000000) << 16);
-	// printf("idx ttl = %08x\n", (response[(*temp)++] | 0x00000000) << 8);
-	// printf("after = %08x\n", response[*temp]);
-	// printf("idx ttl = %08x\n", (response[(*temp)++] | 0x00000000));
-	dns_rr_ttl ttl = (((response[(*temp)++] | 0x00000000) << 24) |
-							((response[(*temp)++] | 0x00000000) << 16) |
-							((response[(*temp)++] | 0x00000000) << 8)  |
-							 (response[(*temp)++] | 0x00000000) );
-	//printf("ttl = %08x\n", ttl);
+	(*temp)++;																														//Currently on class byte, advance to first ttl byte
+	dns_rr_ttl ttl = (((response[(*temp)++] | 0x00000000) << 24) |				//Bit shift left 24 so that we have the 2 bytes on the far left and increment index
+							((response[(*temp)++] | 0x00000000) << 16) |							//Bit shift left 16 to get the 3rd and 4th bytes going left and increment index
+							((response[(*temp)++] | 0x00000000) << 8)  |							//Bit shift left 8 to get the 5th and 6th bytes going left and increment index
+							 (response[(*temp)++] | 0x00000000) );										//No bit shift because we are now on the 7th and 8th bytes.
 	return ttl;
 }
 
-//get rr_len so we can get rdata
+//Get rr_len so we can get rdata
 dns_rdata_len get_rr_data_len(int* temp, char* response){
 	dns_rdata_len r_data_len = ( ((response[(*temp)++] | 0x0000) << 8) | response[(*temp)++]);
 	return r_data_len;
 }
 
-//create the dns_rr struct
+//Create the dns_rr struct
 dns_rr* dns_rr_builder(int* index_RR_p, char* response){
 	int start_idx = *index_RR_p;
 	dns_rr* rr = (dns_rr*)malloc(sizeof(dns_rr));
@@ -339,6 +327,7 @@ dns_rr* dns_rr_builder(int* index_RR_p, char* response){
 	return rr;
 }
 
+//Return the index of where the rdata begins in the response
 int get_index_r_data(char* response, unsigned char* rdata, dns_rdata_len rdata_len){
 	int i;
 	int j = 0;
@@ -352,16 +341,16 @@ int get_index_r_data(char* response, unsigned char* rdata, dns_rdata_len rdata_l
 	}
 }
 
+//Build and set the dns_answer_entry struct. Then we can iterate throught the built in linked list to get the values we need!
 dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned char *response, int length) {
 
 	int index_RR_p = get_index_first_rr(response, length);
 	int idx = index_RR_p;
 
-	//check to see how many answer rr's we have
+	//Check to see how many answer rr's we have
 	int answer_rr = get_answer_RR(response);
 
 	dns_rr** RRs = (dns_rr**)malloc(sizeof(dns_rr*) * answer_rr);
-	//dns_rr* rr = get_RR_type(&index_RR_p, response);
 	index_RR_p = idx;
 
 	dns_answer_entry* dae_entry = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
@@ -371,7 +360,7 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 
 	char owner_rr[BUF_SIZE];
 
-	//if we have 0 answer_rr, it means it was invalid... end here
+	//If we have 0 answer_rr, it means it was invalid... end here, output nothing, same with root.
 	if(answer_rr == 0){
 		free(dae_entry);
 		return NULL;
@@ -379,14 +368,28 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 
 	int i;
 	for(i = 0; i < answer_rr; i++){
-		RRs[i] = dns_rr_builder(&index_RR_p, response);				//create the dns_rr for each answer_rr
+		RRs[i] = dns_rr_builder(&index_RR_p, response);				//Create the dns_rr for each answer_rr
 		//printRR(*RRs[i]);
 	}
-	int passes = 1;
+	int passes = 1;																					//This is used to tell if we have set the first dns_entry in the linked list or not, if we have then we use next
 	dns_answer_entry* next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
 
+	/*
+	The following is the implemented psuedo code provided from the spec
+		set qname to the initial name queried
+		(i.e., the query name in the question section)
+		for each resource record (RR) in the answer section:
+			if the owner name of RR matches qname and the type matches the qtype:
+				extract the address from the RR, convert it to a string, and add it
+				to the result list
+			else if the owner name of RR matches qname and the type is (5) CNAME:
+			the name is an alias; extract the canonical name from the RR rdata,
+			and set qname to that value, and add it to the result list
+		return NULL (no match was found)
+	*/
+
 	for(i = 0; i < answer_rr; i++){
-		//check if names
+		//Check if names
 		int match = matching_name(RRs[i]->name, qname);
 		if(RRs[i]->type == qtype && match){
 			int count = 0;
@@ -412,11 +415,10 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 			}
 			next->next = NULL;
 		}
-		else if(match && RRs[i]->type == 5){
+		else if(match && RRs[i]->type == 5){																				//CNAME
 			int start = get_index_r_data(response, RRs[i]->rdata, RRs[i]->rdata_len);
 			qname = name_ascii_from_wire(response, &start);
 
-			//printf("%s\n", qname);
 			if(passes){
 				first->value = (char*)malloc(*qname);
 				strcpy(first->value, qname);
@@ -433,10 +435,10 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 			passes = 0;
 		}
 	}
-
 	return first;
 }
 
+//Send the dns query string and receive a response from the server. Build the simple UDP socket to connect
 int send_recv_message(unsigned char *request, int requestlen, unsigned char *response, char *server, unsigned short port) {
 
 	 struct addrinfo hints;
@@ -466,6 +468,7 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
 			exit(EXIT_FAILURE);
 	}
 
+		//nread will be the length of the response
 		nread = read(sfd, response, BUF_SIZE);
 		if (nread == -1) {
 			perror("read");
@@ -475,6 +478,7 @@ int send_recv_message(unsigned char *request, int requestlen, unsigned char *res
 		return nread;
 }
 
+//Get started by creating the query, sending and receiving the response, then return the dns struct
 dns_answer_entry *resolve(char *qname, char *server) {
 
 	unsigned char wire[BUF_SIZE];
