@@ -384,7 +384,9 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 	}
 	int passes = 1;
 	dns_answer_entry* next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
+
 	for(i = 0; i < answer_rr; i++){
+		//check if names
 		int match = matching_name(RRs[i]->name, qname);
 		if(RRs[i]->type == qtype && match){
 			int count = 0;
@@ -403,9 +405,10 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 			}
 			else{
 				next->value = (char*) malloc(*s);
-				strcpy(first->value,s);
+				strcpy(next->value,s);
 				next->next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
 				next = next->next;
+				next->next = NULL;
 			}
 			next->next = NULL;
 		}
@@ -413,23 +416,18 @@ dns_answer_entry *get_answer_address(char *qname, dns_rr_type qtype, unsigned ch
 			int start = get_index_r_data(response, RRs[i]->rdata, RRs[i]->rdata_len);
 			qname = name_ascii_from_wire(response, &start);
 
-			printf("%s\n", qname);
+			//printf("%s\n", qname);
 			if(passes){
-				printf("here %s\n", qname);
-
 				first->value = (char*)malloc(*qname);
 				strcpy(first->value, qname);
 				first->next = next;
-				printf("first = %s\n", first->next->value);
 				passes = 0;
 			}
 			else{
-				printf("there\n");
 				next->value = (char*) malloc(*qname);
-				strcpy(first->value,qname);
+				strcpy(next->value,qname);
 				next->next = (dns_answer_entry*)malloc(sizeof(dns_answer_entry));
 				next = next->next;
-				printf("next = %s\n", next->value);
 			}
 			next->next = NULL;
 			passes = 0;
